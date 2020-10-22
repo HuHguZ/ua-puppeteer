@@ -57,6 +57,7 @@ const main = async () => {
                 button.style.border = 'none';
                 button.style.borderRadius = '10px';
                 button.style.padding = '10px'
+                button.style.cursor = 'pointer';
                 button.addEventListener('click', new Function(func));
                 document.body.appendChild(button);
             });
