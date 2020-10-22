@@ -63,7 +63,6 @@ const main = async () => {
         }, `console.log("${sercretClickId}")`);
         page.on('console', async event => {
             if (event.text() === sercretClickId) {
-                console.log('match');
                 await page.solveRecaptchas();
             }
         });
