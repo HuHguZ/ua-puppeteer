@@ -1,11 +1,10 @@
 import puppeteer from 'puppeteer-extra';
 import StealthPlugin from 'puppeteer-extra-plugin-stealth';
 import RecaptchaPlugin from 'puppeteer-extra-plugin-recaptcha';
+import crypto from 'crypto';
 import fs from 'fs';
 
 const [, , proxy, token] = process.argv;
-
-puppeteer.use(StealthPlugin());
 
 puppeteer.use(
     RecaptchaPlugin({
@@ -16,6 +15,8 @@ puppeteer.use(
         visualFeedback: true // colorize reCAPTCHAs (violet = detected, green = solved)
     })
 );
+
+puppeteer.use(StealthPlugin());
 
 const main = async () => {
     const [ip, port, username, password] = proxy.split(':');
@@ -33,31 +34,39 @@ const main = async () => {
             `--load-extension=${process.cwd()}/extension`,
         ]
     });
-    const pages = new Map();
     browser.on('targetcreated', async target => {
         const page = await target.page();
         if (!page) {
             return;
         }
-        page.id = Date.now();
         await page.authenticate({
             username,
             password
         });
-        const timer = setInterval(async () => {
-            await page.solveRecaptchas();
-        }, 1000);
-        pages.set(page.id, timer);
-    });
-    browser.on('targetdestroyed', async target => {
-        const page = await target.page();
-        if (!page) {
-            return;
-        }
-        if (pages.get(page.id)) {
-            clearInterval(pages.get(page.id));
-            pages.delete(page.id);
-        }
+        const sercretClickId = crypto.randomBytes(8).toString('hex');
+        await page.evaluateOnNewDocument((func) => {
+            window.addEventListener('DOMContentLoaded', () => {
+                const button = document.createElement('button');
+                button.style.position = 'fixed';
+                button.style.left = '10px';
+                button.style.top = '10px';
+                button.innerText = 'Решить капчу';
+                button.style.zIndex = 999999;
+                button.style.fontSize = '20px';
+                button.style.backgroundColor = 'green';
+                button.style.border = 'none';
+                button.style.borderRadius = '10px';
+                button.style.padding = '10px'
+                button.addEventListener('click', new Function(func));
+                document.body.appendChild(button);
+            });
+        }, `console.log("${sercretClickId}")`);
+        page.on('console', async event => {
+            if (event.text() === sercretClickId) {
+                console.log('match');
+                await page.solveRecaptchas();
+            }
+        });
     });
     const [mainPage] = await browser.pages();
     await mainPage.authenticate({
